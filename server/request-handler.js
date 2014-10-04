@@ -1,72 +1,41 @@
-/* You should implement your request handler function in this file.
- * And hey! This is already getting passed to http.createServer()
- * in basic-server.js. But it won't work as is.
- * You'll have to figure out a way to export this function from
- * this file and include it in basic-server.js so that it actually works.
- * *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html. */
+var utils = require('./utils');
 
-module.exports = function (request, response) {
-  /* the 'request' argument comes from nodes http module. It includes info about the
-  request - such as what URL the browser is requesting. */
+var objectIdCounter = 1;
 
-  /* Documentation for both request and response can be found at
-   * http://nodemanual.org/0.8.14/nodejs_ref_guide/http.html */
-
-  console.log("Serving request type " + request.method + " for url " + request.url);
-
-  var statusCode = 200;
-
-  /* Without this line, this server wouldn't work. See the note
-   * below about CORS. */
-  var headers = defaultCorsHeaders;
-
-  // headers['Content-Type'] = "text/plain";
-  headers['Content-Type'] = "application/json";
-
-  switch(request.method) {
-    case "GET":
-      response.writeHead(statusCode, headers);
-      response.write(JSON.stringify(chatMessages));
-      break;
-    case "POST":
-      statusCode = 201;
-      var incoming = "";
-      request.on('data', function(data) {
-        incoming += data;
-        console.log(incoming);
-      });
-      request.on('end', function() {
-        var inJSON = JSON.parse(incoming);
-        chatMessages.results.push(inJSON);
-      });
-      response.write(JSON.stringify(chatMessages));
-      break;
-    case "OPTIONS":
-      response.writeHead(statusCode, headers);
-      break;
+var messages = [
+  {
+    text: "Hello World",
+    username: "fred",
+    objectId: objectIdCounter
   }
+];
 
-  /* .writeHead() tells our server what HTTP status code to send back */
+var actions = {
+    'GET': function(request, response){
+      utils.sendResponse(response, {results: messages});
+    },
 
-  // response.writeHead(statusCode, headers);
-  /* Make sure to always call response.end() - Node will not send
-   * anything back to the client until you do. The string you pass to
-   * response.end() will be the body of the response - i.e. what shows
-   * up in the browser.*/
-  response.end();
+    'POST': function(request, response){
+      utils.collectData(request, function(message){
+        objectIdCounter++;
+        message.objectId = objectIdCounter;
+        messages.push(message);
+        utils.sendResponse(response, {objectId: objectIdCounter}, 201);
+      });
+    },
+
+    'OPTIONS': function(request, response){
+      utils.sendResponse(response, null);
+    }
 };
 
-var chatMessages = {};
-chatMessages.results = [{objectId : 1, createdAt: "10", roomname: "lobby", username: "rishigoooomar", text: "GOOOOOOOOOMAR"}];
+module.exports = function(request, response) {
+  console.log("Serving request type " + request.method + " for url " + request.url);
 
-/* These headers will allow Cross-Origin Resource Sharing (CORS).
- * This CRUCIAL code allows this server to talk to websites that
- * are on different domains. (Your chat client is running from a url
- * like file://your/chat/client/index.html, which is considered a
- * different domain.) */
-var defaultCorsHeaders = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "access-control-allow-headers": "content-type, accept",
-  "access-control-max-age": 10 // Seconds.
+  var action = actions[request.method];
+  if( action ){
+    action(request, response);
+  } else {
+    utils.sendResponse(response, null, 404);
+  }
 };
